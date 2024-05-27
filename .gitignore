@@ -1,0 +1,39 @@
+# Ignore Node modules
+node_modules/
+
+# Ignore environment files
+.env
+.env.development
+.env.production
+
+# Ignore log files
+*.log
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore compiled output
+dist/
+tmp/
+out-tsc/
+bazel-out/
+
+# Ignore editor files
+.vscode/
+.idea/
+*.sublime-*
+
+# Ignore miscellaneous
+.angular/cache
+.sass-cache/
+connect.lock
+coverage/
+libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+typings/
+
+# Ignore build artifacts
+build/
