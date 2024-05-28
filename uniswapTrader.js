@@ -1,4 +1,4 @@
-const { ethers, utils } = require('ethers');
+const ethers = require('ethers');
 const { JsonRpcProvider } = require('@ethersproject/providers');
 const { abi: IUniswapV3PoolABI } = require('@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json');
 const { abi: SwapRouterABI } = require('@uniswap/v3-periphery/artifacts/contracts/interfaces/ISwapRouter.sol/ISwapRouter.json');
