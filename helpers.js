@@ -1,24 +1,27 @@
-exports.getPoolImmutables = async (poolContract) => {
-    const [token0, token1, fee] = await Promise.all([
+const { ethers } = require('ethers');
+
+async function getPoolImmutables(poolContract) {
+    const [factory, token0, token1, fee, tickSpacing, maxLiquidityPerTick] = await Promise.all([
+        poolContract.factory(),
         poolContract.token0(),
         poolContract.token1(),
-        poolContract.fee()
-    ])
+        poolContract.fee(),
+        poolContract.tickSpacing(),
+        poolContract.maxLiquidityPerTick()
+    ]);
 
-    const immutables = {
-        token0: token0,
-        token1: token1,
-        fee: fee
-    }
-    return immutables
+    return { factory, token0, token1, fee, tickSpacing, maxLiquidityPerTick };
 }
 
-exports.getPoolState = async (poolContract) => {
-    const slot = poolContract.slot0()
+async function getPoolState(poolContract) {
+    const [liquidity, slot] = await Promise.all([
+        poolContract.liquidity(),
+        poolContract.slot0()
+    ]);
 
-    const state = {
-        sqrtPriceX96: slot[0]
-    }
+    const { sqrtPriceX96, tick, observationIndex, observationCardinality, observationCardinalityNext, feeProtocol, unlocked } = slot;
 
-    return state
+    return { liquidity, sqrtPriceX96, tick, observationIndex, observationCardinality, observationCardinalityNext, feeProtocol, unlocked };
 }
+
+module.exports = { getPoolImmutables, getPoolState };

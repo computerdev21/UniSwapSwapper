@@ -4,7 +4,7 @@ const { abi: IUniswapV3PoolABI } = require('@uniswap/v3-core/artifacts/contracts
 const { abi: SwapRouterABI } = require('@uniswap/v3-periphery/artifacts/contracts/interfaces/ISwapRouter.sol/ISwapRouter.json');
 const { getPoolImmutables, getPoolState } = require('./helpers');
 const ERC20ABI = require('./abi.json');
-
+const cron = require('node-cron');
 require('dotenv').config();
 
 const INFURA_URL_TESTNET = process.env.INFURA_URL_TESTNET;
@@ -31,7 +31,7 @@ const symbol1 = 'UNI';
 const decimals1 = 18;
 const address1 = '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984'; // UNI
 
-async function main() {
+async function performSwap() {
     console.log("Starting script...");
 
     const poolContract = new ethers.Contract(poolAddress, IUniswapV3PoolABI, provider);
@@ -79,6 +79,10 @@ async function main() {
     }
 }
 
-main().catch(error => {
-    console.error("Error in main function:", error);
+cron.schedule('* * * * *', () => {
+    performSwap().catch(error => {
+        console.error("Error in performSwap function:", error);
+    });
 });
+
+console.log("Bot started, running every minute...");
