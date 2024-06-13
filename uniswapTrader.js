@@ -5,14 +5,13 @@ const { abi: SwapRouterABI } = require('@uniswap/v3-periphery/artifacts/contract
 const { getPoolImmutables, getPoolState } = require('./helpers');
 const ERC20ABI = require('./abi.json');
 const cron = require('node-cron');
+const sqlite3 = require('sqlite3').verbose();
 require('dotenv').config();
 
 const INFURA_URL_TESTNET = process.env.INFURA_URL_TESTNET;
-const WALLET_ADDRESS = process.env.WALLET_ADDRESS;
-const WALLET_SECRET = process.env.WALLET_SECRET;
 
-if (!INFURA_URL_TESTNET || !WALLET_ADDRESS || !WALLET_SECRET) {
-    console.error("Please ensure .env file has INFURA_URL_TESTNET, WALLET_ADDRESS, and WALLET_SECRET defined");
+if (!INFURA_URL_TESTNET) {
+    console.error("Please ensure .env file has INFURA_URL_TESTNET defined");
     process.exit(1);
 }
 
@@ -31,8 +30,8 @@ const symbol1 = 'UNI';
 const decimals1 = 18;
 const address1 = '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984'; // UNI
 
-async function performSwap() {
-    console.log("Starting script...");
+async function performSwap(walletAddress, walletSecret) {
+    console.log(`Starting script for wallet: ${walletAddress}...`);
 
     const poolContract = new ethers.Contract(poolAddress, IUniswapV3PoolABI, provider);
 
@@ -42,7 +41,7 @@ async function performSwap() {
     console.log("Pool Immutables:", immutables);
     console.log("Pool State:", state);
 
-    const wallet = new ethers.Wallet(WALLET_SECRET);
+    const wallet = new ethers.Wallet(walletSecret);
     const connectedWallet = wallet.connect(provider);
 
     const swapRouterContract = new ethers.Contract(swapRouterAddress, SwapRouterABI, provider);
@@ -61,7 +60,7 @@ async function performSwap() {
         tokenIn: immutables.token1,
         tokenOut: immutables.token0,
         fee: immutables.fee,
-        recipient: WALLET_ADDRESS,
+        recipient: walletAddress,
         deadline: Math.floor(Date.now() / 1000) + (60 * 10),
         amountIn: amountIn,
         amountOutMinimum: 0,
@@ -79,9 +78,25 @@ async function performSwap() {
     }
 }
 
+async function fetchWalletsAndPerformSwaps() {
+    const db = new sqlite3.Database('./wallets.db');
+
+    db.serialize(() => {
+        db.each("SELECT address, secret FROM wallets", async (err, row) => {
+            if (err) {
+                console.error("Error fetching wallet data:", err);
+                return;
+            }
+            await performSwap(row.address, row.secret);
+        });
+    });
+
+    db.close();
+}
+
 cron.schedule('* * * * *', () => {
-    performSwap().catch(error => {
-        console.error("Error in performSwap function:", error);
+    fetchWalletsAndPerformSwaps().catch(error => {
+        console.error("Error in fetchWalletsAndPerformSwaps function:", error);
     });
 });
 
