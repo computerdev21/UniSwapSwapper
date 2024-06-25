@@ -6,7 +6,6 @@ db.serialize(() => {
 
     const stmt = db.prepare("INSERT INTO wallets (address, secret) VALUES (?, ?)");
     stmt.run('0xYourWalletAddress1', 'yourwalletsecret1');
-    stmt.run('0xYourWalletAddress2', 'yourwalletsecret2');
     stmt.finalize();
 });
 

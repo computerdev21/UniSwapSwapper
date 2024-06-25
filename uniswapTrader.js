@@ -17,18 +17,18 @@ if (!INFURA_URL_TESTNET) {
 
 const provider = new JsonRpcProvider(INFURA_URL_TESTNET);
 
-const poolAddress = "0x51adc79e7760ac5317a0d05e7a64c4f9cb2d4369"; // UNI/WETH on Sepolia
+const poolAddress = "0x5dc05033e825ef24fcdc7fafdeb85d0fc27c78f9"; // KIBERA/WETH pool address
 const swapRouterAddress = '0xE592427A0AEce92De3Edee1F18E0157C05861564';
 
 const name0 = 'Wrapped Ether';
 const symbol0 = 'WETH';
 const decimals0 = 18;
-const address0 = '0xc778417e063141139fce010982780140aa0cd5ab'; // WETH on Sepolia
+const address0 = '0x4200000000000000000000000000000000000006'; // WETH on BAse
 
-const name1 = 'Uniswap Token';
-const symbol1 = 'UNI';
+const name1 = 'KIBAbera';
+const symbol1 = 'KIBERA';
 const decimals1 = 18;
-const address1 = '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984'; // UNI
+const address1 = '0xfde8ceb2e4d4d58480815a0a95d38e3834366b46'; // Kibabera ib base
 
 async function performSwap(walletAddress, walletSecret) {
     console.log(`Starting script for wallet: ${walletAddress}...`);
@@ -46,10 +46,10 @@ async function performSwap(walletAddress, walletSecret) {
 
     const swapRouterContract = new ethers.Contract(swapRouterAddress, SwapRouterABI, provider);
 
-    const inputAmount = 0.001;
+    const inputAmount = 0.0001;
     const amountIn = ethers.utils.parseUnits(inputAmount.toString(), decimals0);
 
-    const approvalAmount = amountIn.mul(100000).toString();
+    const approvalAmount = amountIn.mul(10).toString();
     const tokenContract0 = new ethers.Contract(address0, ERC20ABI, provider);
 
     console.log("Approving token...");
