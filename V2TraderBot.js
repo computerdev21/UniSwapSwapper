@@ -17,7 +17,7 @@ if (!INFURA_URL_TESTNET) {
 const provider = new JsonRpcProvider(INFURA_URL_TESTNET);
 
 const pairAddress = "0x5dc05033e825ef24fcdc7fafdeb85d0fc27c78f9";
-const routerAddress = '0xE592427A0AEce92De3Edee1F18E0157C05861564';
+const routerAddress = '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24';
 
 const name0 = 'Wrapped Ether';
 const symbol0 = 'WETH';
@@ -44,7 +44,7 @@ async function performSwap(walletAddress, walletSecret) {
 
         const routerContract = new ethers.Contract(routerAddress, UniswapV2RouterABI, wallet);
 
-        const inputAmount = ethers.utils.parseUnits('0.01', decimals0); // Increased amount for visibility
+        const inputAmount = ethers.utils.parseUnits('0.002', decimals0); // Increased amount for visibility
         console.log(`Amount to swap: ${ethers.utils.formatUnits(inputAmount, decimals0)} ${symbol0}`);
 
         const approvalAmount = inputAmount.mul(10).toString();
@@ -100,23 +100,27 @@ async function performSwap(walletAddress, walletSecret) {
         console.log(`Gas used: ${gasUsed.toString()}`);
         console.log(`Gas cost: ${ethers.utils.formatEther(gasCost)} ETH`);
 
-        // Get amount received by querying the pair contract for the Swap event
-        const filter = pairContract.filters.Swap(walletAddress);
+        // Get all events emitted by the pair contract
+        const filter = pairContract.filters.Swap();
         const events = await pairContract.queryFilter(filter, receipt.blockNumber, receipt.blockNumber);
-        const swapEvent = events.find(event => event.transactionHash === transaction.hash);
 
-        if (swapEvent) {
-            const amountOut = swapEvent.args.amount1Out;
-            console.log(`Amount received: ${ethers.utils.formatUnits(amountOut, decimals1)} ${symbol1}`);
+        if (events.length > 0) {
+            events.forEach(event => {
+                console.log(`Event: ${event.event}`);
+                console.log(`  Transaction Hash: ${event.transactionHash}`);
+                console.log(`  Amount In: ${ethers.utils.formatUnits(event.args.amount0In, decimals0)} ${symbol0}`);
+                console.log(`  Amount Out: ${ethers.utils.formatUnits(event.args.amount1Out, decimals1)} ${symbol1}`);
+            });
         } else {
-            console.log("Swap event not found in transaction receipt");
+            console.log("No Swap events found in transaction receipt");
         }
 
         // Summary
         console.log("\nSwap Summary:");
         console.log(`Amount transferred: ${ethers.utils.formatUnits(inputAmount, decimals0)} ${symbol0}`);
         console.log(`Gas cost: ${ethers.utils.formatEther(gasCost)} ETH`);
-        if (swapEvent) {
+        if (events.length > 0) {
+            const swapEvent = events[0];
             console.log(`Amount received: ${ethers.utils.formatUnits(swapEvent.args.amount1Out, decimals1)} ${symbol1}`);
         }
 
