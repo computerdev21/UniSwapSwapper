@@ -23,58 +23,66 @@ const swapRouterAddress = '0xE592427A0AEce92De3Edee1F18E0157C05861564';
 const name0 = 'Wrapped Ether';
 const symbol0 = 'WETH';
 const decimals0 = 18;
-const address0 = '0x4200000000000000000000000000000000000006'; // WETH on BAse
+const address0 = '0x4200000000000000000000000000000000000006'; // WETH on Base
 
 const name1 = 'KIBAbera';
 const symbol1 = 'KIBERA';
 const decimals1 = 18;
-const address1 = '0xfde8ceb2e4d4d58480815a0a95d38e3834366b46'; // Kibabera ib base
+const address1 = '0xfde8ceb2e4d4d58480815a0a95d38e3834366b46'; // Kibabera on Base
 
 async function performSwap(walletAddress, walletSecret) {
     console.log(`Starting script for wallet: ${walletAddress}...`);
 
     const poolContract = new ethers.Contract(poolAddress, IUniswapV3PoolABI, provider);
 
-    const immutables = await getPoolImmutables(poolContract);
-    const state = await getPoolState(poolContract);
-
-    console.log("Pool Immutables:", immutables);
-    console.log("Pool State:", state);
-
-    const wallet = new ethers.Wallet(walletSecret);
-    const connectedWallet = wallet.connect(provider);
-
-    const swapRouterContract = new ethers.Contract(swapRouterAddress, SwapRouterABI, provider);
-
-    const inputAmount = 0.0001;
-    const amountIn = ethers.utils.parseUnits(inputAmount.toString(), decimals0);
-
-    const approvalAmount = amountIn.mul(10).toString();
-    const tokenContract0 = new ethers.Contract(address0, ERC20ABI, provider);
-
-    console.log("Approving token...");
-    const approvalResponse = await tokenContract0.connect(connectedWallet).approve(swapRouterAddress, approvalAmount);
-    console.log("Approval response:", approvalResponse);
-
-    const params = {
-        tokenIn: immutables.token1,
-        tokenOut: immutables.token0,
-        fee: immutables.fee,
-        recipient: walletAddress,
-        deadline: Math.floor(Date.now() / 1000) + (60 * 10),
-        amountIn: amountIn,
-        amountOutMinimum: 0,
-        sqrtPriceLimitX96: 0,
-    };
-
-    console.log("Executing swap...");
     try {
+        // Test basic interaction with the contract
+        const slot0 = await poolContract.slot0();
+        console.log("Slot0:", slot0);
+
+        const immutables = await getPoolImmutables(poolContract);
+        const state = await getPoolState(poolContract);
+
+        console.log("Pool Immutables:", immutables);
+        console.log("Pool State:", state);
+
+        const wallet = new ethers.Wallet(walletSecret);
+        const connectedWallet = wallet.connect(provider);
+
+        const swapRouterContract = new ethers.Contract(swapRouterAddress, SwapRouterABI, provider);
+
+        const inputAmount = 0.00005;
+        const amountIn = ethers.utils.parseUnits(inputAmount.toString(), decimals0);
+
+        const approvalAmount = amountIn.mul(10).toString();
+        const tokenContract0 = new ethers.Contract(address0, ERC20ABI, provider);
+
+        console.log("Approving token...");
+        const approvalResponse = await tokenContract0.connect(connectedWallet).approve(swapRouterAddress, approvalAmount);
+        console.log("Approval response:", approvalResponse);
+
+        const params = {
+            tokenIn: immutables.token1,
+            tokenOut: immutables.token0,
+            fee: immutables.fee,
+            recipient: walletAddress,
+            deadline: Math.floor(Date.now() / 1000) + (60 * 10),
+            amountIn: amountIn,
+            amountOutMinimum: 0,
+            sqrtPriceLimitX96: 0,
+        };
+
+        console.log("Executing swap with params:", params);
+
         const transaction = await swapRouterContract.connect(connectedWallet).exactInputSingle(params, {
-            gasLimit: ethers.utils.hexlify(1000000)
+            gasLimit: ethers.utils.hexlify(10000000)
         });
         console.log("Transaction:", transaction);
     } catch (error) {
-        console.error("Error executing transaction:", error);
+        console.error("Detailed error:", JSON.stringify(error, null, 2));
+        console.error("Error message:", error.message);
+        console.error("Error code:", error.code);
+        console.error("Error data:", error.data);
     }
 }
 

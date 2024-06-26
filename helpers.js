@@ -1,27 +1,23 @@
 const { ethers } = require('ethers');
 
-async function getPoolImmutables(poolContract) {
-    const [factory, token0, token1, fee, tickSpacing, maxLiquidityPerTick] = await Promise.all([
-        poolContract.factory(),
-        poolContract.token0(),
-        poolContract.token1(),
-        poolContract.fee(),
-        poolContract.tickSpacing(),
-        poolContract.maxLiquidityPerTick()
+async function getPairImmutables(pairContract) {
+    const [token0, token1, pairAddress] = await Promise.all([
+        pairContract.token0(),
+        pairContract.token1(),
+        pairContract.address
     ]);
 
-    return { factory, token0, token1, fee, tickSpacing, maxLiquidityPerTick };
+    return { token0, token1, pairAddress };
 }
 
-async function getPoolState(poolContract) {
-    const [liquidity, slot] = await Promise.all([
-        poolContract.liquidity(),
-        poolContract.slot0()
-    ]);
+async function getPairState(pairContract) {
+    const [reserve0, reserve1] = await pairContract.getReserves();
+    const blockTimestampLast = reserve1; // Assuming reserve1 contains the timestamp
 
-    const { sqrtPriceX96, tick, observationIndex, observationCardinality, observationCardinalityNext, feeProtocol, unlocked } = slot;
+    const [reserve0Amount, reserve1Amount] = reserve0;
 
-    return { liquidity, sqrtPriceX96, tick, observationIndex, observationCardinality, observationCardinalityNext, feeProtocol, unlocked };
+    return { reserve0Amount, reserve1Amount, blockTimestampLast };
 }
 
-module.exports = { getPoolImmutables, getPoolState };
+
+module.exports = { getPairImmutables, getPairState };
