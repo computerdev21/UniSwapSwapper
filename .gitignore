@@ -37,3 +37,4 @@ typings/
 
 # Ignore build artifacts
 build/
+wallets.db
