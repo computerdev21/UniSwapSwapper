@@ -44,7 +44,7 @@ async function performSwap(walletAddress, walletSecret) {
 
         const routerContract = new ethers.Contract(routerAddress, UniswapV2RouterABI, wallet);
 
-        const inputAmount = ethers.utils.parseUnits('0.002', decimals0); // Increased amount for visibility
+        const inputAmount = ethers.utils.parseUnits('0.001', decimals0); // Increased amount for visibility
         console.log(`Amount to swap: ${ethers.utils.formatUnits(inputAmount, decimals0)} ${symbol0}`);
 
         const approvalAmount = inputAmount.mul(10).toString();
