@@ -29,10 +29,11 @@ const symbol1 = 'KIBERA';
 const decimals1 = 18;
 const address1 = '0xfde8ceb2e4d4d58480815a0a95d38e3834366b46';
 
-async function performSwap(walletAddress, walletSecret) {
+async function performSwap(wallet, nextWalletAddress = null) {
+    const { address: walletAddress, secret: walletSecret } = wallet;
     console.log(`Starting script for wallet: ${walletAddress}...`);
 
-    const wallet = new ethers.Wallet(walletSecret, provider);
+    const walletInstance = new ethers.Wallet(walletSecret, provider);
     const pairContract = new ethers.Contract(pairAddress, IUniswapV2PairABI, provider);
 
     try {
@@ -42,13 +43,13 @@ async function performSwap(walletAddress, walletSecret) {
         console.log("Reserve1:", reserve1.toString());
         console.log("Block Timestamp Last:", blockTimestampLast.toString());
 
-        const routerContract = new ethers.Contract(routerAddress, UniswapV2RouterABI, wallet);
+        const routerContract = new ethers.Contract(routerAddress, UniswapV2RouterABI, walletInstance);
 
-        const inputAmount = ethers.utils.parseUnits('0.001', decimals0); // Increased amount for visibility
+        const inputAmount = ethers.utils.parseUnits('0.0001', decimals0); // Increased amount for visibility
         console.log(`Amount to swap: ${ethers.utils.formatUnits(inputAmount, decimals0)} ${symbol0}`);
 
         const approvalAmount = inputAmount.mul(10).toString();
-        const tokenContract0 = new ethers.Contract(address0, ERC20ABI, wallet);
+        const tokenContract0 = new ethers.Contract(address0, ERC20ABI, walletInstance);
 
         console.log("Approving token...");
         const approvalResponse = await tokenContract0.approve(routerAddress, approvalAmount);
@@ -104,15 +105,31 @@ async function performSwap(walletAddress, walletSecret) {
         const filter = pairContract.filters.Swap();
         const events = await pairContract.queryFilter(filter, receipt.blockNumber, receipt.blockNumber);
 
+        let amountReceived = 0;
         if (events.length > 0) {
             events.forEach(event => {
                 console.log(`Event: ${event.event}`);
                 console.log(`  Transaction Hash: ${event.transactionHash}`);
                 console.log(`  Amount In: ${ethers.utils.formatUnits(event.args.amount0In, decimals0)} ${symbol0}`);
                 console.log(`  Amount Out: ${ethers.utils.formatUnits(event.args.amount1Out, decimals1)} ${symbol1}`);
+                amountReceived = event.args.amount1Out;
             });
         } else {
             console.log("No Swap events found in transaction receipt");
+        }
+
+        // Transfer KIBERA tokens to the next wallet if available
+        if (nextWalletAddress && amountReceived > 0) {
+            console.log(`Transferring ${ethers.utils.formatUnits(amountReceived, decimals1)} ${symbol1} to ${nextWalletAddress}`);
+            const tokenContract1 = new ethers.Contract(address1, ERC20ABI, walletInstance);
+            const transferResponse = await tokenContract1.transfer(nextWalletAddress, amountReceived);
+            console.log("Transfer transaction hash:", transferResponse.hash);
+
+            console.log("Waiting for transfer confirmation...");
+            const transferReceipt = await transferResponse.wait();
+            console.log("Transfer confirmed in block:", transferReceipt.blockNumber);
+        } else if (!nextWalletAddress) {
+            console.log("Only one wallet found. Please add more wallets to transfer the tokens.");
         }
 
         // Summary
@@ -138,24 +155,28 @@ async function fetchWalletsAndPerformSwaps() {
     const db = new sqlite3.Database('./wallets.db');
 
     return new Promise((resolve, reject) => {
-        db.serialize(() => {
-            db.each("SELECT address, secret FROM wallets", async (err, row) => {
-                if (err) {
-                    console.error("Error fetching wallet data:", err);
-                    reject(err);
-                    return;
-                }
-                const success = await performSwap(row.address, row.secret);
+        db.all("SELECT address, secret FROM wallets", async (err, rows) => {
+            if (err) {
+                console.error("Error fetching wallet data:", err);
+                reject(err);
+                return;
+            }
+
+            if (rows.length === 1) {
+                console.log("Only one wallet found. Skipping transfers after swaps.");
+            }
+
+            for (let i = 0; i < rows.length; i++) {
+                const wallet = rows[i];
+                const nextWalletAddress = rows.length > 1 ? rows[(i + 1) % rows.length].address : null;
+
+                const success = await performSwap(wallet, nextWalletAddress);
                 if (!success) {
-                    console.error(`Swap failed for wallet: ${row.address}`);
+                    console.error(`Swap failed for wallet: ${wallet.address}`);
                 }
-            }, (err, count) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(count);
-                }
-            });
+            }
+
+            resolve(rows.length);
         });
 
         db.close();
