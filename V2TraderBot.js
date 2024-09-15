@@ -29,7 +29,7 @@ const symbol1 = 'KIBERA';
 const decimals1 = 18;
 const address1 = '0xfde8ceb2e4d4d58480815a0a95d38e3834366b46';
 
-async function performSwap(wallet, nextWalletAddress = null) {
+async function performSwap(wallet) {
     const { address: walletAddress, secret: walletSecret } = wallet;
     console.log(`Starting script for wallet: ${walletAddress}...`);
 
@@ -45,13 +45,13 @@ async function performSwap(wallet, nextWalletAddress = null) {
 
         const routerContract = new ethers.Contract(routerAddress, UniswapV2RouterABI, walletInstance);
 
-        const inputAmount = ethers.utils.parseUnits('0.0001', decimals0); // Increased amount for visibility
+        const inputAmount = ethers.utils.parseUnits('0.0001', decimals0); // Amount of WETH to swap for KIBERA
         console.log(`Amount to swap: ${ethers.utils.formatUnits(inputAmount, decimals0)} ${symbol0}`);
 
         const approvalAmount = inputAmount.mul(10).toString();
         const tokenContract0 = new ethers.Contract(address0, ERC20ABI, walletInstance);
 
-        console.log("Approving token...");
+        console.log("Approving WETH for swap...");
         const approvalResponse = await tokenContract0.approve(routerAddress, approvalAmount);
         console.log("Approval transaction hash:", approvalResponse.hash);
 
@@ -64,9 +64,9 @@ async function performSwap(wallet, nextWalletAddress = null) {
         // Get current gas prices
         const feeData = await provider.getFeeData();
         const maxFeePerGas = feeData.maxFeePerGas;
-        const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
+        let maxPriorityFeePerGas = ethers.utils.parseUnits('1', 'gwei');
 
-        // Estimate gas limit for the swap transaction
+        // Estimate gas limit for the initial swap (WETH -> KIBERA)
         const estimatedGasLimit = await routerContract.estimateGas.swapExactTokensForTokens(
             inputAmount,
             0,
@@ -75,7 +75,7 @@ async function performSwap(wallet, nextWalletAddress = null) {
             deadline
         );
 
-        console.log("Executing swap...");
+        console.log("Executing swap (WETH -> KIBERA)...");
         const transaction = await routerContract.swapExactTokensForTokens(
             inputAmount,
             0,
@@ -94,14 +94,14 @@ async function performSwap(wallet, nextWalletAddress = null) {
         const receipt = await transaction.wait();
         console.log("Swap confirmed in block:", receipt.blockNumber);
 
-        // Calculate gas cost
+        // Calculate gas cost for initial swap
         const gasUsed = receipt.gasUsed;
         const effectiveGasPrice = receipt.effectiveGasPrice;
         const gasCost = gasUsed.mul(effectiveGasPrice);
         console.log(`Gas used: ${gasUsed.toString()}`);
         console.log(`Gas cost: ${ethers.utils.formatEther(gasCost)} ETH`);
 
-        // Get all events emitted by the pair contract
+        // Check the swap events for received KIBERA
         const filter = pairContract.filters.Swap();
         const events = await pairContract.queryFilter(filter, receipt.blockNumber, receipt.blockNumber);
 
@@ -118,30 +118,57 @@ async function performSwap(wallet, nextWalletAddress = null) {
             console.log("No Swap events found in transaction receipt");
         }
 
-        // Transfer KIBERA tokens to the next wallet if available
-        if (nextWalletAddress && amountReceived > 0) {
-            console.log(`Transferring ${ethers.utils.formatUnits(amountReceived, decimals1)} ${symbol1} to ${nextWalletAddress}`);
-            const tokenContract1 = new ethers.Contract(address1, ERC20ABI, walletInstance);
-            const transferResponse = await tokenContract1.transfer(nextWalletAddress, amountReceived);
-            console.log("Transfer transaction hash:", transferResponse.hash);
+        // Perform the reverse swap (KIBERA -> WETH)
+        if (amountReceived > 0) {
+            console.log(`Performing reverse swap: ${ethers.utils.formatUnits(amountReceived, decimals1)} ${symbol1} to WETH`);
 
-            console.log("Waiting for transfer confirmation...");
-            const transferReceipt = await transferResponse.wait();
-            console.log("Transfer confirmed in block:", transferReceipt.blockNumber);
-        } else if (!nextWalletAddress) {
-            console.log("Only one wallet found. Please add more wallets to transfer the tokens.");
+            const tokenContract1 = new ethers.Contract(address1, ERC20ABI, walletInstance);
+
+            // Approve KIBERA for the reverse swap
+            console.log("Approving KIBERA for reverse swap...");
+            const reverseApprovalResponse = await tokenContract1.approve(routerAddress, amountReceived);
+            console.log("Approval transaction hash:", reverseApprovalResponse.hash);
+
+            console.log("Waiting for reverse approval confirmation...");
+            const reverseApprovalReceipt = await reverseApprovalResponse.wait();
+            console.log("Approval confirmed in block:", reverseApprovalReceipt.blockNumber);
+
+            // Estimate gas limit for the reverse swap (KIBERA -> WETH)
+            const reverseEstimatedGasLimit = await routerContract.estimateGas.swapExactTokensForTokens(
+                amountReceived,
+                0,
+                [address1, address0],
+                walletAddress,
+                deadline
+            );
+
+            console.log("Executing reverse swap (KIBERA -> WETH)...");
+            const reverseTransaction = await routerContract.swapExactTokensForTokens(
+                amountReceived,
+                0,
+                [address1, address0],
+                walletAddress,
+                deadline,
+                {
+                    gasLimit: reverseEstimatedGasLimit,
+                    maxFeePerGas: maxFeePerGas,
+                    maxPriorityFeePerGas: maxPriorityFeePerGas
+                }
+            );
+            console.log("Reverse swap transaction hash:", reverseTransaction.hash);
+
+            console.log("Waiting for reverse swap confirmation...");
+            const reverseReceipt = await reverseTransaction.wait();
+            console.log("Reverse swap confirmed in block:", reverseReceipt.blockNumber);
+        } else {
+            console.log("No tokens received for reverse swap.");
         }
 
-        // Summary
         console.log("\nSwap Summary:");
         console.log(`Amount transferred: ${ethers.utils.formatUnits(inputAmount, decimals0)} ${symbol0}`);
         console.log(`Gas cost: ${ethers.utils.formatEther(gasCost)} ETH`);
-        if (events.length > 0) {
-            const swapEvent = events[0];
-            console.log(`Amount received: ${ethers.utils.formatUnits(swapEvent.args.amount1Out, decimals1)} ${symbol1}`);
-        }
 
-        return true; // Swap completed successfully
+        return true; // Swap and reverse swap completed successfully
     } catch (error) {
         console.error("Detailed error:", JSON.stringify(error, null, 2));
         console.error("Error message:", error.message);
