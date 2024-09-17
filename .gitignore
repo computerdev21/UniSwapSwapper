@@ -37,4 +37,5 @@ typings/
 
 # Ignore build artifacts
 build/
-wallets.db
+wallets.db/
+setupDatabase.js/
