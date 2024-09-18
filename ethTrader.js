@@ -73,9 +73,10 @@ async function performSwap(walletAddress, walletSecret) {
         };
 
         console.log("Executing swap with params:", params);
+        const gasEstimate = await swapRouterContract.estimateGas.exactInputSingle(params);
 
         const transaction = await swapRouterContract.connect(connectedWallet).exactInputSingle(params, {
-            gasLimit: ethers.utils.hexlify(10000000)
+            gasLimit: gasEstimate.mul(120).div(100) // 20% buffer
         });
         console.log("Transaction:", transaction);
     } catch (error) {
